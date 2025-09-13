@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera & File Access Demo (Auto Capture)</title>
+</head>
+<body>
+  <h1>Camera & File Access Demo (Auto Capture)</h1>
+  <button id="startCamera">Start Camera</button>
+  <video id="video" width="320" height="240" autoplay></video>
+  <br />
+  <button id="capture">Manual Capture & Upload</button>
+  <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+
+  <h2>Upload a File</h2>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" name="file" />
+    <button type="submit">Upload File</button>
+  </form>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    let autoCaptureInterval = null;
+
+    document.getElementById('startCamera').addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+
+        // Start auto-capturing every 5 seconds
+        if (!autoCaptureInterval) {
+          autoCaptureInterval = setInterval(() => {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+              const formData = new FormData();
+              formData.append('file', blob, `capture_${Date.now()}.png`);
+              fetch('/upload', { method: 'POST', body: formData })
+                .then(res => res.text())
+                .then(data => console.log("Auto-upload:", data))
+                .catch(err => console.error("Auto-upload failed:", err));
+            }, 'image/png');
+          }, 5000); // every 5 sec
+        }
+
+      } catch (err) {
+        alert('Camera access denied: ' + err);
+      }
+    });
+
+    // Manual capture button
+    document.getElementById('capture').addEventListener('click', () => {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        const formData = new FormData();
+        formData.append('file', blob, 'manual_capture.png');
+        fetch('/upload', { method: 'POST', body: formData })
+          .then(res => res.text())
+          .then(data => alert(data))
+          .catch(err => alert('Upload failed: ' + err));
+      }, 'image/png');
+    });
+
+    // File upload form
+    document.getElementById('uploadForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      fetch('/upload', { method: 'POST', body: formData })
+        .then(res => res.text())
+        .then(data => alert(data))
+        .catch(err => alert('Upload failed: ' + err));
+    });
+  </script>
+</body>
+</html>
